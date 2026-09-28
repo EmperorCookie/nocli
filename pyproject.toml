@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nocli"
+version = "0.0.1"
+authors = [{ name = "Fred Dufresne" }]
+description = "Function-signature-driven CLI authoring library for argparse"
+readme = "README.md"
+license = "MPL-2.0"
+requires-python = ">=3.10"
+dependencies = [
+    # Support older Python versions
+    "typing_extensions>=4.5;python_version<'3.11'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9",
+]
+
+[tool.hatch.build]
+packages = ["src/nocli"]
+
+[tool.hatch.envs.test]
+dependencies = ["pytest"]
+
+[tool.hatch.envs.test.scripts]
+run = "pytest"
+
+[tool.black]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

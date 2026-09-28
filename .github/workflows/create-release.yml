@@ -1,0 +1,154 @@
+name: Create Release
+
+on:
+  push:
+    branches:
+    - main
+
+permissions:
+  contents: write
+  id-token: write  # Required for PyPI Trusted Publishing (OIDC) token exchange
+
+jobs:
+  dry-run:
+    name: Dry Run
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Semantic Release Dry Run
+      uses: cycjimmy/semantic-release-action@v3
+      id: dry-release
+      with:
+        semantic_version: "25"
+        dry_run: true
+        extra_plugins: |
+          conventional-changelog-conventionalcommits@5.0.0
+          @semantic-release/changelog@6.0.3
+          @semantic-release/commit-analyzer@9.0.2
+          @semantic-release/github@8.0.5
+          @semantic-release/release-notes-generator@10.0.3
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    outputs:
+      published: ${{ steps.dry-release.outputs.new_release_published }}
+      new-version: ${{ steps.dry-release.outputs.new_release_version }}
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    environment: main
+    needs:
+    - dry-run
+    if: needs.dry-run.outputs.published == 'true'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+        fetch-depth: 0
+
+    - name: Generate Token
+      id: token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ vars.COOKIE_BOT_APP_ID }}
+        private-key: ${{ secrets.COOKIE_BOT_PRIVATE_KEY }}
+
+    - name: Create Release
+      uses: cycjimmy/semantic-release-action@v3
+      with:
+        semantic_version: "25"
+        extra_plugins: |
+          conventional-changelog-conventionalcommits@5.0.0
+          @semantic-release/changelog@6.0.3
+          @semantic-release/commit-analyzer@9.0.2
+          @semantic-release/github@8.0.5
+          @semantic-release/release-notes-generator@10.0.3
+      env:
+        GITHUB_TOKEN: ${{ steps.token.outputs.token }}
+        GH_TOKEN: ${{ steps.token.outputs.token }}
+        GIT_AUTHOR_NAME: github-actions[bot]
+        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        GIT_COMMITTER_NAME: github-actions[bot]
+        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+
+  publish-pypi:
+    name: Publish PyPI
+    runs-on: ubuntu-latest
+    environment: main
+    needs:
+    - dry-run
+    - create-release
+    if: needs.dry-run.outputs.published == 'true'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+
+    - name: Build
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install hatch build
+        hatch version ${{ needs.dry-run.outputs.new-version }}
+        python -m build
+
+    # No password: with id-token: write, the action exchanges a GitHub OIDC
+    # token for a short-lived PyPI token (Trusted Publishing).
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+
+  cleanup-release:
+    name: Cleanup Release
+    runs-on: ubuntu-latest
+    environment: main
+    needs:
+    - dry-run
+    - create-release
+    - publish-pypi
+    if: needs.create-release.result == 'success' && needs.publish-pypi.result == 'failure'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+        fetch-depth: 0
+
+    - name: Generate Token
+      id: token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ vars.COOKIE_BOT_APP_ID }}
+        private-key: ${{ secrets.COOKIE_BOT_PRIVATE_KEY }}
+
+    - name: Delete Release and Tag
+      env:
+        GITHUB_TOKEN: ${{ steps.token.outputs.token }}
+        GH_TOKEN: ${{ steps.token.outputs.token }}
+      run: |
+        gh release delete v${{ needs.dry-run.outputs.new-version }} --yes --cleanup-tag
+
+    - name: Revert Release Commit
+      env:
+        GIT_AUTHOR_NAME: github-actions[bot]
+        GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        GIT_COMMITTER_NAME: github-actions[bot]
+        GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      run: |
+        git remote set-url origin https://x-access-token:${{ steps.token.outputs.token }}@github.com/${{ github.repository }}
+        git revert HEAD --no-edit
+        git push origin main
