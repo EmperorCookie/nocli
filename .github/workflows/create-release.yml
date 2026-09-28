@@ -104,7 +104,12 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install hatch build
         hatch version ${{ needs.dry-run.outputs.new-version }}
-        python -m build
+        # Build sdist and wheel separately: with plain `python -m build` the
+        # wheel is rebuilt from the sdist, where the flat package layout no
+        # longer matches `packages = ["src/nocli"]` and hatchling ships an
+        # empty wheel (verified with hatchling 1.32.4).
+        python -m build -s
+        python -m build -w
 
     # No password: with id-token: write, the action exchanges a GitHub OIDC
     # token for a short-lived PyPI token (Trusted Publishing).

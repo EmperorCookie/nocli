@@ -73,7 +73,7 @@ pip install nocli
 
 Full example: [example.py](example.py)
 
-Th simple example below shows how to create a CLI from a regular Python function:
+The simple example below shows how to create a CLI from a regular Python function:
 
 ```python
 #!/bin/python3
