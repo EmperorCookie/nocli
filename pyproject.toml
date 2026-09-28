@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "nocli"
 version = "0.0.1"
 authors = [{ name = "Fred Dufresne" }]
-description = "Function-signature-driven CLI authoring library for argparse"
+description = "Function signature driven CLI authoring library"
 readme = "README.md"
 license = "MPL-2.0"
 requires-python = ">=3.10"

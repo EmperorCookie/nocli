@@ -1,6 +1,6 @@
 # nocli
 
-Function-signature-driven CLI authoring for Python.
+Function signature driven CLI authoring for Python.
 
 Turn ordinary Python functions into fully featured CLIs without maintaining a separate parser definition. `nocli` derives CLI behavior from function signatures and type annotations, with `Annotated` configuration and composable constructors for explicit customization.
 
