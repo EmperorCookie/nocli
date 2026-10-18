@@ -1,0 +1,59 @@
+name: Semantic Release
+description: Runs semantic-release in two stages, so that what is published is what was planned
+
+inputs:
+  dry-run:
+    description: Set to "true" to analyze only (the plan stage); nothing is published
+    default: "false"
+  plan:
+    description: The plan output of an earlier run; when given, the commits are not analyzed again
+    default: ""
+  ci:
+    description: Set to "true" or "false" to override semantic-release's CI detection
+    default: ""
+  branches:
+    description: JSON array that replaces the `branches` option of the semantic-release configuration
+    default: ""
+  unset-gha-env:
+    description: Set to "true" to hide GitHub Actions from semantic-release; see the README
+    default: "false"
+
+outputs:
+  plan:
+    description: What would be (or was) released, to give to a later run as `plan`; "{}" for nothing
+    value: ${{ steps.run.outputs.plan }}
+  published:
+    description: '"true" when there is a release to make (or made), "false" otherwise'
+    value: ${{ steps.run.outputs.published }}
+  version:
+    description: Version of the release, empty when there is none
+    value: ${{ steps.run.outputs.version }}
+  notes:
+    description: Release notes, empty when there is no release
+    value: ${{ steps.run.outputs.notes }}
+
+runs:
+  using: composite
+  steps:
+  - name: Setup Node
+    uses: actions/setup-node@v7
+    with:
+      node-version: latest
+
+  - name: Install
+    shell: bash
+    working-directory: ${{ github.action_path }}
+    run: npm ci --ignore-scripts
+
+  # Runs from the repository, where semantic-release looks for its configuration. Inputs go
+  # through the environment because some of them derive from pull request data.
+  - name: Run
+    id: run
+    shell: bash
+    run: node "$GITHUB_ACTION_PATH/run.js"
+    env:
+      INPUT_DRY_RUN: ${{ inputs.dry-run }}
+      INPUT_PLAN: ${{ inputs.plan }}
+      INPUT_CI: ${{ inputs.ci }}
+      INPUT_BRANCHES: ${{ inputs.branches }}
+      INPUT_UNSET_GHA_ENV: ${{ inputs.unset-gha-env }}

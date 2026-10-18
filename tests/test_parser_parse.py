@@ -1,11 +1,13 @@
-import pytest
 from unittest.mock import MagicMock
 
-from nocli._parser import (
+import pytest
+
+import nocli
+from nocli._parser import Parser
+from nocli.exceptions import (
     FlagAlreadyPassedError,
     MissingOptionError,
     MissingValueError,
-    Parser,
     UnexpectedTokenError,
     UnrecognizedTokenError,
 )
@@ -87,9 +89,15 @@ class TestParseFlags:
 
     def test_boolean_flag(self):
         p = Parser()
-        p.add_option("verbose", flags=["--verbose"], count=0, constructor=bool)
+        p.add_option("verbose", flags=["--verbose"], count=0, constructor=lambda: True)
         _, kwargs = p.parse(["--verbose"])
         assert kwargs["verbose"] is True
+
+    def test_flag_repeatable(self):
+        p = Parser()
+        p.add_option("v", flags=["-v"], count=0, repeatable=True, constructor=list)
+        _, kwargs = p.parse(["-v", "-v"])
+        assert kwargs["v"] == [(), ()]
 
     def test_boolean_flag_absent(self):
         p = Parser()
@@ -226,7 +234,7 @@ class TestParseSticky:
     def test_sticky_not_interrupted_by_flag(self):
         p = Parser()
         p.add_option("files", flags=["--files"], repeatable=True, sticky=True)
-        p.add_option("verbose", flags=["--verbose"], count=0, constructor=bool)
+        p.add_option("verbose", flags=["--verbose"], count=0, constructor=lambda: True)
         _, kwargs = p.parse(["--files", "a", "b", "--verbose"])
         assert kwargs["files"] == ["a", "b", "--verbose"]
         assert "verbose" not in kwargs
@@ -268,7 +276,7 @@ class TestParseExceptionFlag:
             pass
 
         p = Parser()
-        p.add_option("help", flags=["--help"], count=0, constructor=bool, exception=MyError)
+        p.add_option("help", flags=["--help"], count=0, constructor=lambda: True, exception=MyError)
         with pytest.raises(MyError) as exc:
             p.parse(["--help"])
         assert exc.value.args[0] is True
@@ -282,7 +290,7 @@ class TestParseExceptionFlag:
         p.add_option("help", flags=["--help"], count=0, constructor=constructor, exception=MyError)
         with pytest.raises(MyError):
             p.parse(["--help"])
-        constructor.assert_called_once_with("True")
+        constructor.assert_called_once_with()
 
     def test_exception_value_is_constructor_return(self):
         class MyError(Exception):
@@ -355,6 +363,15 @@ class TestParseErrors:
         with pytest.raises(UnexpectedTokenError) as exc:
             p.parse(["a", "extra"])
         assert exc.value.token == "extra"
+
+    def test_construction(self):
+        p = nocli.Parser().add_option("n", flags=["--n"], constructor=int)
+        with pytest.raises(nocli.exceptions.ConstructionError) as exc:
+            p.parse(["--n", "x"])
+        assert (exc.value.location, exc.value.value) == ("n", "x")
+        assert isinstance(exc.value.cause, ValueError)
+        assert exc.value.reason == str(exc.value.cause)
+        assert exc.value.__cause__ is exc.value.cause
 
     def test_argv_not_mutated(self):
         p = Parser()

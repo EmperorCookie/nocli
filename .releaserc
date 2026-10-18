@@ -4,16 +4,48 @@
     ],
     "plugins": [
         [
-            "@semantic-release/commit-analyzer",
+            "./.github/patch-notes-plugin/patch-notes.js",
             {
-                "preset": "conventionalcommits"
-            }
-        ],
-        [
-            "@semantic-release/release-notes-generator",
-            {
-                "preset": "conventionalcommits",
-                "changelogFile": "CHANGELOG.md"
+                "analyzer": {
+                    "preset": "conventionalcommits",
+                    "releaseRules": [
+                        { "breaking": true, "release": "major" },
+                        { "type": "added", "release": "minor" },
+                        { "type": "modified", "release": "minor" },
+                        { "type": "fixed", "release": "patch" },
+                        { "type": "updated", "release": "patch" },
+                        { "type": "renamed", "release": "patch" },
+                        { "type": "moved", "release": "patch" },
+                        { "type": "removed", "release": "minor" }
+                    ]
+                },
+                "notes": {
+                    "preset": "conventionalcommits",
+                    "changelogFile": "CHANGELOG.md",
+                    "presetConfig": {
+                        "types": [
+                            { "type": "added", "section": "Added" },
+                            { "type": "modified", "section": "Modified" },
+                            { "type": "fixed", "section": "Fixed" },
+                            { "type": "updated", "section": "Updated" },
+                            { "type": "renamed", "section": "Renamed" },
+                            { "type": "moved", "section": "Moved" },
+                            { "type": "removed", "section": "Removed" },
+                            { "type": "feat", "section": "Features" },
+                            { "type": "feature", "section": "Features" },
+                            { "type": "fix", "section": "Bug Fixes" },
+                            { "type": "perf", "section": "Performance Improvements" },
+                            { "type": "revert", "section": "Reverts" },
+                            { "type": "docs", "section": "Documentation", "hidden": true },
+                            { "type": "style", "section": "Styles", "hidden": true },
+                            { "type": "chore", "section": "Miscellaneous Chores", "hidden": true },
+                            { "type": "refactor", "section": "Code Refactoring", "hidden": true },
+                            { "type": "test", "section": "Tests", "hidden": true },
+                            { "type": "build", "section": "Build System", "hidden": true },
+                            { "type": "ci", "section": "Continuous Integration", "hidden": true }
+                        ]
+                    }
+                }
             }
         ],
         [
