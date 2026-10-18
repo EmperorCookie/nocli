@@ -1,12 +1,11 @@
 import pytest
 
-from nocli import (
+from nocli import Parser, ParserOption
+from nocli.exceptions import (
     DuplicateFlagError,
     FlagAlreadyPassedError,
     MissingOptionError,
     MissingValueError,
-    Parser,
-    ParserOption,
     UnexpectedTokenError,
     UnrecognizedTokenError,
 )

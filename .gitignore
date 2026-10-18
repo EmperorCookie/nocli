@@ -159,8 +159,14 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# Ruff
+.ruff_cache/
+
 # Test Data
 test-data/
 .tmp/
 tmp/
 .graveyard/
+
+# Release tooling (.github/semantic-release-runner)
+node_modules/

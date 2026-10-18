@@ -64,3 +64,22 @@ def test_nested_subcommands():
 def test_subcommand_is_cli():
     cli = _make_subcommand()
     assert isinstance(cli, nocli.Cli)
+
+
+def row(text, token):
+    return next(line for line in text.splitlines() if token in line).strip()
+
+
+def test_help_names(capsys):
+    assert _make_subcommand().run(["help"]) == 0
+    assert row(capsys.readouterr().out, "[subcommand") == "[subcommand (required)]"
+
+
+def test_help_args(capsys):
+    assert _make_subcommand().run(["help"]) == 0
+    assert row(capsys.readouterr().out, "[args...") == "[args... (repeatable, sticky)]"
+
+
+def test_help_of_help(capsys):
+    assert _make_subcommand().run(["help", "help"]) == 0
+    assert row(capsys.readouterr().out, "[subcommand") == "[subcommand]"

@@ -12,12 +12,14 @@ license = "MPL-2.0"
 requires-python = ">=3.10"
 dependencies = [
     # Support older Python versions
-    "typing_extensions>=4.5;python_version<'3.11'",
+    "typing_extensions>=4.5;python_version<'3.13'",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=9",
+    "pyright>=1.1.414",
+    "ruff>=0.17",
 ]
 
 [tool.hatch.build]
@@ -28,6 +30,31 @@ dependencies = ["pytest"]
 
 [tool.hatch.envs.test.scripts]
 run = "pytest"
+
+[tool.ruff]
+line-length = 100
+indent-width = 4
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = false
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint]
+extend-ignore = [
+    "PYI019",  # `Self` was only added in 3.11
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = [
+    "F401",    # Explicit imports are almost never used
+]
+"_compat.py" = [
+    "F401",    # The module exists to export what it imports
+]
 
 [tool.black]
 line-length = 100

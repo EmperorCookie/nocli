@@ -4,16 +4,15 @@
     ],
     "plugins": [
         [
-            "@semantic-release/commit-analyzer",
+            "./.github/patch-notes-plugin/patch-notes.js",
             {
-                "preset": "conventionalcommits"
-            }
-        ],
-        [
-            "@semantic-release/release-notes-generator",
-            {
-                "preset": "conventionalcommits",
-                "changelogFile": "CHANGELOG.md"
+                "analyzer": {
+                    "preset": "conventionalcommits"
+                },
+                "notes": {
+                    "preset": "conventionalcommits",
+                    "changelogFile": "CHANGELOG.md"
+                }
             }
         ],
         [

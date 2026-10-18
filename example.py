@@ -2,20 +2,21 @@
 
 import enum
 import json
-from collections.abc import Callable, Mapping, Sequence
-from operator import not_
+from collections.abc import Callable, Generator, Mapping, Sequence
 from pathlib import Path
 from types import NoneType
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from nocli import CaseType, Cli, CliConfig, Subcommand
+from nocli import DEFAULT_CONSTRUCTORS, CaseType, Cli, CliConfig, Subcommand
 from nocli.constructors import (
     BoolConstructor,
+    CallableConstructor,
     ChoicesConstructor,
+    FlagConstructor,
     HexConstructor,
-    IntOrHexConstructor,
     HexStringConstructor,
+    IntOrHexConstructor,
     IterableConstructor,
     LiteralEvalConstructor,
     OptionalConstructor,
@@ -70,8 +71,6 @@ def interface_recipes(
     stickyPositional: Annotated[
         Sequence[str],
         CliConfig(
-            displayType="list[str]",
-            repeatable=True,
             sticky=True,
             stickyStopFlag="--",
         ),
@@ -99,14 +98,13 @@ def interface_recipes(
     flag: Annotated[
         bool,
         CliConfig(
-            count=0,
+            constructor=FlagConstructor(),
         ),
     ] = False,
     reverseFlag: Annotated[
         bool,
         CliConfig(
-            constructor=not_,
-            count=0,
+            constructor=FlagConstructor(False),
         ),
     ] = True,
     interrupt: Annotated[
@@ -118,7 +116,6 @@ def interface_recipes(
     interruptTuple: Annotated[
         tuple[str, str],
         CliConfig(
-            count=2,
             interrupt=interface_interrupt,
         ),
     ] = ("", ""),
@@ -167,7 +164,7 @@ def simple_types_recipes(
         CliConfig(
             aliases=("u",),
         ),
-    ] = UUID("00000000-0000-0000-0000-000000000000"),
+    ] = UUID("00000000-0000-0000-0000-000000000000"),  # noqa: B008 # Immutable
     optionalParam: Annotated[
         str | None,
         CliConfig(
@@ -191,8 +188,7 @@ def simple_types_recipes(
         int,
         CliConfig(
             aliases=("f",),
-            constructor=lambda: 9001,
-            count=0,
+            constructor=FlagConstructor(9001),
         ),
     ] = 42,
 ) -> int:
@@ -227,7 +223,7 @@ def complex_types_recipes(
         CliConfig(
             description="Invalid values resolve to `False`.",
             aliases=("b",),
-            constructor=BoolConstructor(invalid=False),
+            constructor=BoolConstructor(invalidFinalizer=lambda _: False),
         ),
     ] = False,
     hexParam: Annotated[
@@ -298,8 +294,6 @@ def list_recipes(
     sticky: Annotated[
         list[int],
         CliConfig(
-            constructor=IterableConstructor(list, int),
-            repeatable=True,
             sticky=True,
             stickyStopFlag="--",
         ),
@@ -307,8 +301,7 @@ def list_recipes(
     sticky2: Annotated[
         list[int],
         CliConfig(
-            constructor=IterableConstructor(list, int),
-            repeatable=True,
+            constructor=IterableConstructor(int, list),
             sticky=True,
             stickyStopFlag="--",
         ),
@@ -317,37 +310,35 @@ def list_recipes(
         list[int] | None,
         CliConfig(
             aliases=("r",),
-            constructor=IterableConstructor(list, int),
-            repeatable=True,
         ),
     ] = None,
     pairs: Annotated[
         list[tuple[int, int]] | None,
         CliConfig(
             aliases=("p",),
-            constructor=IterableConstructor(list, TupleConstructor(int, int)),
-            count=2,
-            repeatable=True,
+            constructor=IterableConstructor(TupleConstructor(int, int), list),
         ),
     ] = None,
     flags: Annotated[
         list[bool] | None,
         CliConfig(
             aliases=("f",),
-            constructor=IterableConstructor(list, bool),
-            count=0,
-            repeatable=True,
+            constructor=IterableConstructor(FlagConstructor(), list),
         ),
     ] = None,
     stickyPairs: Annotated[
         list[tuple[int, int]] | None,
         CliConfig(
             aliases=("s",),
-            constructor=IterableConstructor(list, TupleConstructor(int, int)),
-            count=2,
-            repeatable=True,
             sticky=True,
             stickyStopFlag="--",
+        ),
+    ] = None,
+    single: Annotated[
+        list[tuple[int, int]] | None,
+        CliConfig(
+            description="Not repeatable; the one occurrence becomes a single-item list.",
+            repeatable=False,
         ),
     ] = None,
 ) -> int:
@@ -359,6 +350,7 @@ def list_recipes(
         f"{pairs=}",
         f"{flags=}",
         f"{stickyPairs=}",
+        f"{single=}",
         sep="\n",
     )
     return 0
@@ -368,9 +360,6 @@ def mapping_recipes(
     sticky: Annotated[
         Mapping[str, int],
         CliConfig(
-            constructor=IterableConstructor(dict, TupleConstructor(str, int)),
-            count=2,
-            repeatable=True,
             sticky=True,
             stickyStopFlag="--",
         ),
@@ -378,9 +367,7 @@ def mapping_recipes(
     sticky2: Annotated[
         Mapping[str, int],
         CliConfig(
-            constructor=IterableConstructor(dict, TupleConstructor(str, int)),
-            count=2,
-            repeatable=True,
+            constructor=IterableConstructor(TupleConstructor(str, int), dict),
             sticky=True,
             stickyStopFlag="--",
         ),
@@ -389,9 +376,6 @@ def mapping_recipes(
         Mapping[str, int] | None,
         CliConfig(
             aliases=("r",),
-            constructor=IterableConstructor(dict, TupleConstructor(str, int)),
-            count=2,
-            repeatable=True,
         ),
     ] = None,
     pairs: Annotated[
@@ -399,10 +383,8 @@ def mapping_recipes(
         CliConfig(
             aliases=("p",),
             constructor=IterableConstructor(
-                dict, TupleConstructor(str, TupleConstructor(int, int))
+                TupleConstructor(str, TupleConstructor(int, int)), dict
             ),
-            count=3,
-            repeatable=True,
         ),
     ] = None,
     flags: Annotated[
@@ -410,21 +392,18 @@ def mapping_recipes(
         CliConfig(
             aliases=("f",),
             constructor=IterableConstructor(
-                dict, TupleConstructor(lambda _: str(mapping_increment()), lambda _: True)
+                TupleConstructor(
+                    CallableConstructor(lambda: str(mapping_increment()), count=0),
+                    FlagConstructor(),
+                ),
+                dict,
             ),
-            count=0,
-            repeatable=True,
         ),
     ] = None,
     stickyPairs: Annotated[
         Mapping[str, tuple[int, int]] | None,
         CliConfig(
             aliases=("s",),
-            constructor=IterableConstructor(
-                dict, TupleConstructor(str, TupleConstructor(int, int))
-            ),
-            count=3,
-            repeatable=True,
             sticky=True,
             stickyStopFlag="--",
         ),
@@ -443,47 +422,162 @@ def mapping_recipes(
     return 0
 
 
+def union_recipes(
+    intOrStr: Annotated[
+        int | str,
+        CliConfig(
+            description="Tried in declaration order; `42` is an int, `forty-two` falls back to str.",
+            aliases=("i",),
+        ),
+    ] = 0,
+    strOrInt: Annotated[
+        str | int,
+        CliConfig(
+            description="`str` accepts everything, so `int` is never reached.",
+            aliases=("s",),
+        ),
+    ] = 0,
+    trailingNone: Annotated[
+        int | None,
+        CliConfig(
+            description="A trailing `None` means `or do nothing`; it is never parsed.",
+            aliases=("t",),
+        ),
+    ] = None,
+    leadingNone: Annotated[
+        None | int,
+        CliConfig(
+            description="A leading `None` is parsed first: an empty value is `None`.",
+            aliases=("l",),
+        ),
+    ] = 1,
+    intOrBool: Annotated[
+        int | bool,
+        CliConfig(
+            description="Members can be any constructor: `1` is an int, `yes` is a bool.",
+            aliases=("b",),
+        ),
+    ] = 0,
+    pairOrPair: Annotated[
+        tuple[int, int] | tuple[str, str],
+        CliConfig(
+            description="Members must consume the same number of values.",
+            aliases=("p",),
+        ),
+    ] = (0, 0),
+    floatFirst: Annotated[
+        float | Literal["inf", "-inf", "nan"],
+        CliConfig(
+            description="`float` already parses the special values, so the literals are never reached.",
+            aliases=("f",),
+        ),
+    ] = 0.0,
+    specialFirst: Annotated[
+        Literal["inf", "-inf", "nan"] | float,
+        CliConfig(
+            description="The special values are tried first, so they stay strings.",
+            aliases=("e",),
+        ),
+    ] = 0.0,
+    numbers: Annotated[
+        list[int | Literal["int", "pos", "nat"]] | None,
+        CliConfig(
+            description=(
+                "Each item is a number or the name of a number group. Unions nest anywhere an"
+                " annotation does, but `list[int] | Literal[...]` would be rejected: members must"
+                " agree on whether they repeat."
+            ),
+            aliases=("n",),
+        ),
+    ] = None,
+) -> int:
+    """Demonstrates unions of arbitrary constructors."""
+    print(
+        f"{intOrStr=}",
+        f"{strOrInt=}",
+        f"{trailingNone=}",
+        f"{leadingNone=}",
+        f"{intOrBool=}",
+        f"{pairOrPair=}",
+        f"{floatFirst=}",
+        f"{specialFirst=}",
+        f"{numbers=}",
+        sep="\n",
+    )
+    return 0
+
+
+class ShoutConstructor(CallableConstructor[[str], str]):
+    """Custom constructor that claims `str` annotations and upper-cases the value."""
+
+    @classmethod
+    def can_handle(cls, annotation: Any) -> bool:
+        return annotation is str
+
+    @classmethod
+    def resolve(cls, annotation: Any) -> Generator[Any, Any, "ShoutConstructor"]:
+        yield from ()
+        return cls(str.upper, displayType="str")
+
+
+def override_recipes(
+    shout: str = "",
+    shoutList: list[str] | None = None,
+    shoutUnion: int | str = 0,
+    number: int = 0,
+) -> int:
+    """Demonstrates a custom constructor list; every `str` annotation is upper-cased."""
+    print(
+        f"{shout=}",
+        f"{shoutList=}",
+        f"{shoutUnion=}",
+        f"{number=}",
+        sep="\n",
+    )
+    return 0
+
+
 def casing_recipes(
-    __camelCase: Annotated[
+    __camelCase: Annotated[  # noqa: PYI063 # For demonstration purposes
         bool,
         CliConfig(
             description="Original: `__camelCase`",
-            count=0,
+            constructor=FlagConstructor(),
         ),
     ] = False,
     _camelCase: Annotated[
         bool,
         CliConfig(
             description="Original: `_camelCase`",
-            count=0,
+            constructor=FlagConstructor(),
         ),
     ] = False,
     camelCase: Annotated[
         bool,
         CliConfig(
             description="Original: `camelCase`",
-            count=0,
+            constructor=FlagConstructor(),
         ),
     ] = False,
     snake_case: Annotated[
         bool,
         CliConfig(
             description="Original: `snake_case`",
-            count=0,
+            constructor=FlagConstructor(),
         ),
     ] = False,
     UPPER_SNAKE_CASE: Annotated[
         bool,
         CliConfig(
             description="Original: `UPPER_SNAKE_CASE`",
-            count=0,
+            constructor=FlagConstructor(),
         ),
     ] = False,
     PascalCase: Annotated[
         bool,
         CliConfig(
             description="Original: `PascalCase`",
-            count=0,
+            constructor=FlagConstructor(),
         ),
     ] = False,
 ) -> int:
@@ -519,7 +613,7 @@ def parse_cli(
     """Parses a value of the selected type."""
     try:
         parsed = PARSERS[format](value)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 # Intentional catch-all
         print(f"Error: {e}")
         return 1
     print(
@@ -625,6 +719,11 @@ cli = Subcommand(
                 ("constructors", "c"): Cli(complex_types_recipes),
                 ("lists", "l"): Cli(list_recipes),
                 ("mappings", "m"): Cli(mapping_recipes),
+                ("unions", "u"): Cli(union_recipes),
+                ("overrides", "o"): Cli(
+                    override_recipes,
+                    constructors=[ShoutConstructor, *DEFAULT_CONSTRUCTORS],
+                ),
                 ("windows", "w"): Subcommand(
                     {
                         ("interfaces", "i"): Cli(
@@ -649,6 +748,17 @@ cli = Subcommand(
                         ),
                         ("mappings", "m"): Cli(
                             mapping_recipes,
+                            flagCase=CaseType.SNAKE_UPPER,
+                            flagPrefixes=("/", "/"),
+                        ),
+                        ("unions", "u"): Cli(
+                            union_recipes,
+                            flagCase=CaseType.SNAKE_UPPER,
+                            flagPrefixes=("/", "/"),
+                        ),
+                        ("overrides", "o"): Cli(
+                            override_recipes,
+                            constructors=[ShoutConstructor, *DEFAULT_CONSTRUCTORS],
                             flagCase=CaseType.SNAKE_UPPER,
                             flagPrefixes=("/", "/"),
                         ),

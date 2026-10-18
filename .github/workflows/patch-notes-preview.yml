@@ -20,41 +20,59 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Setup Node
-      uses: actions/setup-node@v2
-      with:
-        node-version: 16
+    # semantic-release only analyzes a checked out branch that exists on the remote, so the merge
+    # commit that the checkout leaves detached is put on a local branch named after the PR's branch.
+    - name: Branch
+      env:
+        HEAD_REF: ${{ github.head_ref }}
+      run: git switch -c "$HEAD_REF"
 
-    - name: Node Dependencies
-      run: |
-        npm install \
-          conventional-changelog-conventionalcommits@5.0.0 \
-          @semantic-release/changelog@6.0.3 \
-          @semantic-release/commit-analyzer@9.0.2 \
-          @semantic-release/github@8.0.5 \
-          @semantic-release/release-notes-generator@10.0.3
-
+    # Only the plan stage is needed: the same runner as the release workflow, in dry run, so that
+    # the repository's .releaserc (including the patch-notes plugin) decides what the notes look
+    # like. The branch name goes in as a JSON string literal, never as text. The README of the
+    # runner explains why `ci` and `unset-gha-env` are needed for a pull request.
     - name: Patch Notes
       id: patch-notes
-      uses: guilhermetod/semantic-release-notes-preview@v1.0.0
-
-    - name: Find PR Comment
-      uses: peter-evans/find-comment@v2
-      id: pr-comment
+      uses: ./.github/semantic-release-runner
       with:
-        issue-number: ${{ github.event.pull_request.number }}
-        token: ${{ secrets.GITHUB_TOKEN }}
-        comment-author: "github-actions[bot]"
-        body-includes: Patch notes for this PR
+        dry-run: true
+        ci: false
+        unset-gha-env: true
+        branches: ${{ format('["main", {0}]', toJSON(github.head_ref)) }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    # The notes come from commit messages, so they reach the script through the environment and
+    # are never interpolated into the script text.
     - name: Comment On PR
-      uses: peter-evans/create-or-update-comment@v2
+      uses: actions/github-script@v9
+      env:
+        NOTES: ${{ steps.patch-notes.outputs.notes }}
       with:
-        edit-mode: replace
-        comment-id: ${{ steps.pr-comment.outputs.comment-id }}
-        issue-number: ${{ github.event.pull_request.number }}
-        token: ${{ secrets.GITHUB_TOKEN }}
-        body: |
-          Patch notes for this PR:
+        script: |
+          const marker = "Patch notes for this PR";
+          const notes = process.env.NOTES || "No release would be created from this PR.";
+          const body = `${marker}:\n\n${notes}`;
+          const { owner, repo } = context.repo;
+          const issue_number = context.issue.number;
 
-          ${{ steps.patch-notes.outputs.releaseNotes }}
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner,
+            repo,
+            issue_number,
+          });
+          const existing = comments.find(
+            (comment) =>
+              comment.user.login === "github-actions[bot]" && comment.body.includes(marker)
+          );
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner,
+              repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+          }

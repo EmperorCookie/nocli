@@ -45,9 +45,9 @@ def test_config_sticky_stop_flag_stops_consumption():
 
     def fn(
         files: Annotated[
-            list[str],
+            list[str] | None,
             nocli.CliConfig(repeatable=True, sticky=True, stickyStopFlag="--"),
-        ] = [],
+        ] = None,
         out: str = "",
     ) -> int:
         captured.append({"files": files, "out": out})
@@ -59,11 +59,9 @@ def test_config_sticky_stop_flag_stops_consumption():
 
 def test_config_sticky_without_stop_flag_never_stops():
     def fn(
-        files: Annotated[
-            list[str], nocli.CliConfig(repeatable=True, sticky=True)
-        ] = [],
+        files: Annotated[list[str] | None, nocli.CliConfig(repeatable=True, sticky=True)] = None,
     ) -> int:
-        return len(files)
+        return len(files or [])
 
     # No `stickyStopFlag`, so the stop token is just another value
     assert nocli.Cli(fn).run(["--files", "a", "b", "--"]) == 3
@@ -72,11 +70,11 @@ def test_config_sticky_without_stop_flag_never_stops():
 def test_config_sticky_stop_flag_shown_in_help():
     def fn(
         files: Annotated[
-            list[str],
+            list[str] | None,
             nocli.CliConfig(repeatable=True, sticky=True, stickyStopFlag="--"),
-        ] = [],
+        ] = None,
     ) -> int:
-        return len(files)
+        return len(files or [])
 
     help_text = nocli.Cli(fn)._format_help(full=True)
     assert "sticky[stop=`--`]" in help_text
