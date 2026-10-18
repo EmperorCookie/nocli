@@ -38,30 +38,23 @@ Note: I'm the sole maintainer of this library; I prioritize the features that I 
 - ✅ Sticky arguments
 - ✅ Subcommand routing
 - 🚧 Subcommand-level options
+- 🚧 Customizable rendering of values in help
 
 ### Parser
 
 - ✅ Automatic parsing from basic type annotations
 - ✅ Custom constructors support
-    - ✅ Custom constructors chosen by type annotation (`Cli(constructors=...)`)
+- ✅ Custom constructors chosen by type annotation (`Cli(constructors=...)`)
 - ✅ Hex (int/str, mixed int/hex)
-- ✅ Boolean values (strict by default)
-    - ✅ Automatically detected
-- ✅ Unions (`X | Y`, `Union[...]`), tried in declaration order
-    - ✅ Automatically detected
-- ✅ `X | None` (the option is simply absent) and `None | X` (an empty value is `None`)
-    - ✅ Automatically detected
-    - ✅ `OptionalConstructor` for custom `None` values
-- ✅ Tuple types
-    - ✅ Automatically detected
-- ✅ Iterable types
-    - ✅ Automatically detected
-- ✅ Mapping types
-    - ✅ Automatically detected
-- ✅ `Literal[...]`
-    - ✅ Automatically detected
-- ✅ Enums
-    - ✅ Automatically detected
+- ✅ Boolean values (strict by default, automatically detected)
+- ✅ Unions (`X | Y`, `Union[...]`), tried in declaration order (automatically detected)
+- ✅ `X | None` (the option is simply absent) and `None | X` (an empty value is `None`)  (automatically detected)
+- ✅ `OptionalConstructor` for custom `None` values
+- ✅ Tuple types (automatically detected)
+- ✅ Iterable types (automatically detected)
+- ✅ Mapping types (automatically detected)
+- ✅ `Literal[...]` (automatically detected)
+- ✅ Enums (automatically detected)
 - 🚧 Unions of values that consume a different number of CLI values
 - 🚧 Structured types such as `NamedTuple` and dataclasses
 
@@ -85,14 +78,16 @@ from typing import Annotated
 
 from nocli import Cli, CliConfig
 
+
 def greet(
     name: str,
     # Description and metaconfig is collocated
-    greeting: Annotated[str, CliConfig(description="The greeting to use.")] = "Hello"
+    greeting: Annotated[str, CliConfig(description="The greeting to use.")] = "Hello",
 ) -> int:
     """Greet someone with a custom greeting."""
     print(f"{greeting}, {name}!")
     return 0
+
 
 cli = Cli(greet)
 
@@ -129,6 +124,7 @@ from typing import Literal
 
 from nocli import Cli
 
+
 def resize(
     path: str,
     # Unions are tried in order: `42` is an int, `auto` is the literal
@@ -140,6 +136,7 @@ def resize(
     """Resizes an image."""
     print(f"{path=} {width=} {tags=} {size=}")
     return 0
+
 
 cli = Cli(resize)
 
@@ -184,6 +181,7 @@ from typing import Annotated
 from nocli import Cli, CliConfig
 from nocli.constructors import BoolConstructor
 
+
 # Booleans are strict by default: only recognized values (and numbers) are accepted, and
 # anything else is a parse error. `invalidFinalizer` opts into the permissive behavior; here,
 # unrecognized values simply resolve to `False`.
@@ -195,6 +193,7 @@ def truthy(
     """Parses common truthy representations; other values are `False`."""
     print(value)
     return 0
+
 
 cli = Cli(truthy)
 
@@ -240,6 +239,7 @@ from typing import Any
 from nocli import DEFAULT_CONSTRUCTORS, Cli
 from nocli.constructors import CallableConstructor, ConstructorAbc
 
+
 class ShoutConstructor(CallableConstructor[[str], str]):
     """Handles `str` annotations by upper-casing the value."""
 
@@ -252,9 +252,11 @@ class ShoutConstructor(CallableConstructor[[str], str]):
         yield from ()  # Nothing nested to resolve
         return cls(str.upper, displayType="str")
 
+
 def hello(name: str, times: list[str] | None = None) -> int:
     print(name, times)
     return 0
+
 
 # Constructors are asked in order, and the first one that handles the annotation is used
 cli = Cli(hello, constructors=[ShoutConstructor, *DEFAULT_CONSTRUCTORS])
@@ -298,11 +300,13 @@ from nocli import Subcommand
 from .greet import cli as greet_cli
 from .truthy import cli as truthy_cli
 
-cli = Subcommand({
-    # Supports both strings and tuples for command aliases
-    "greet": greet_cli,
-    ("truthy", "t"): truthy_cli,
-})
+cli = Subcommand(
+    {
+        # Supports both strings and tuples for command aliases
+        "greet": greet_cli,
+        ("truthy", "t"): truthy_cli,
+    }
+)
 
 if __name__ == "__main__":
     cli.main()
