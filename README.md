@@ -63,8 +63,8 @@ Legend:
 - ✅ Mapping types (automatically detected)
 - ✅ `Literal[...]` (automatically detected)
 - ✅ Enums (automatically detected)
-- 🚧 Unions of values that consume a different number of CLI values
 - 🚧 Structured types such as `NamedTuple` and dataclasses
+- ❌ Unions of values that consume a different number of CLI values
 
 ## Installation
 
