@@ -22,14 +22,14 @@ So why `nocli`? Because it gets out of the way when you aren't using it.
 
 ## Features
 
+Note: I'm the sole maintainer of this library; I prioritize the features that I need and use. If you want a feature prioritized (whether it's in the list below or not), please open an issue and make the request.
+
 Legend:
 
 - ✅ Implemented
 - 🚧 Planned
 - ❓ Not planned; will be considered if requested
 - ❌ Not planned; will not be implemented
-
-Note: I'm the sole maintainer of this library; I prioritize the features that I need and use. If you want a feature prioritized (whether it's in the list below or not), please open an issue and make the request.
 
 ### CLI
 
